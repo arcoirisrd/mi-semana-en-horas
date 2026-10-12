@@ -11,7 +11,7 @@ La persona cuenta su semana (agua, luz, movilidad, filas), ve su índice, elige 
 
 ## Configuración pendiente
 - Dirección publicada: https://arcoirisrd.github.io/mi-semana-en-horas/ (si cambia, actualizar `og:image` en `index.html`).
-- Para enviar respuestas a Survey123, rellenar `SURVEY_ITEM_ID` y revisar `FIELDS` al principio del script.
+- Para guardar respuestas, poner en `LAYER_URL` (al principio del script) la URL de la capa del formulario IPU v3, terminada en `/FeatureServer/0`. La capa debe ser pública y permitir solo añadir.
 
 ## Publicación
 GitHub Pages: Settings → Pages → Deploy from a branch → `main` / root.

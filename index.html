@@ -139,6 +139,11 @@ textarea{min-height:84px;resize:vertical}
 .actions{display:grid;gap:10px}
 a.btn{display:block;text-align:center;text-decoration:none}
 .copied{font-size:.88rem;color:var(--accent);min-height:1.2em}
+.privacy{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.privacy summary{cursor:pointer;font-weight:600;color:var(--signal)}
+.privacy-body{display:grid;gap:8px;margin-top:10px;font-size:.9rem;line-height:1.4}
+.consent{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:.95rem;cursor:pointer}
+.consent input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--gold)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -147,17 +152,11 @@ a.btn{display:block;text-align:center;text-decoration:none}
 <div class="app" id="app"></div>
 
 <script>
-/* ===== Configuración para enlazar con Survey123 (pendiente) =====
-   SURVEY_ITEM_ID: id del formulario v3 en ArcGIS Online.
-   FIELDS: nombre del campo del XLSForm para cada dato del juego. */
-const SURVEY_ITEM_ID = "";
-const FIELDS = {muni:"municipio",barrio:"barrio",genero:"genero",espera:"espera_sola",
-  agua_freq:"agua_frec",agua_sabe:"agua_sabe",agua_h:"agua_h",
-  luz_freq:"luz_frec",luz_sabe:"luz_sabe",luz_h:"luz_h",
-  modo:"modo",movil_h:"movil_h",movil_sabe:"movil_sabe",reserva_min:"reserva_min",trayectos:"trayectos_sem",
-  filas_h:"filas_h",filas_sabe:"filas_sabe",
-  h_total:"h_total",u_media:"u_media",ipu:"ipu",
-  usos:"usos_horas",desorden:"desorden",medidas:"medidas_escalera",pet1:"peticion_1",pet2:"peticion_2",pet3:"peticion_3",otra:"peticion_otra",reflexion:"reflexion"};
+/* ===== Envío a ArcGIS Online =====
+   LAYER_URL: URL de la capa del formulario v3 terminada en /FeatureServer/0
+   (se copia de la página del elemento de la capa en ArcGIS Online). Vacía = no se envía. */
+const LAYER_URL = "";
+const GAME_VERSION = "1.1";
 
 const H5=[["Nada",0],["Menos de 1 hora",.5],["De 1 a 3 horas",2],["De 3 a 6 horas",4.5],["Más de 6 horas",8]];
 const HM=[["Nada",0],["Hasta 1 hora",1],["De 1 a 4 horas",2.5],["De 4 a 8 horas",6],["Más de 8 horas",10]];
@@ -178,7 +177,7 @@ const DESTINOS=["Ayuntamiento","Acueducto (CAASD u otro)","Empresa de electricid
 const BUDGET=5;
 
 let S=initState(), step=0;
-function initState(){return{muni:"",barrio:"",genero:"",espera:"",agua_freq:"",agua_sabe:null,agua_h:null,luz_freq:"",luz_sabe:null,luz_h:null,modo:"",movil_h:null,movil_sabe:null,reserva_min:null,trayectos:null,filas_h:null,filas_sabe:null,usos:[],reflexion:"",desorden:"",medidas:[],pets:[],otra:""}}
+function initState(){return{consent:false,sent:false,muni:"",barrio:"",genero:"",espera:"",agua_freq:"",agua_sabe:null,agua_h:null,luz_freq:"",luz_sabe:null,luz_h:null,modo:"",movil_h:null,movil_sabe:null,reserva_min:null,trayectos:null,filas_h:null,filas_sabe:null,usos:[],reflexion:"",desorden:"",medidas:[],pets:[],otra:""}}
 
 /* ===== Cálculo ===== */
 function parts(s){
@@ -248,14 +247,24 @@ function nav(scene,{next="Seguir",canBack=true}={}){
 function gaugeSVG(){let t="";for(let i=0;i<60;i++){const a=(i*6-90)*Math.PI/180,big=i%5===0,R=46,L=big?8:4.5;
   t+=`<line class="tk${i===19||i===20?" b":""}" x1="${50+R*Math.cos(a)}" y1="${50+R*Math.sin(a)}" x2="${50+(R-L)*Math.cos(a)}" y2="${50+(R-L)*Math.sin(a)}" stroke-width="${big?2.4:1.3}"/>`}
   const a=150*Math.PI/180;return`<svg viewBox="0 0 100 100" aria-hidden="true">${t}<line class="hand" x1="50" y1="50" x2="${50+31*Math.cos(a)}" y2="${50+31*Math.sin(a)}" stroke-width="3" stroke-linecap="round"/><circle class="pin" cx="50" cy="50" r="4"/></svg>`}
+const PRIVACY=`<div class="privacy-body">
+  <p><b>Quién lo organiza.</b> Centro de Acción Social y Promoción del Desarrollo Arcoíris, ONG dominicana.</p>
+  <p><b>Para qué.</b> Para estudiar cuánto tiempo pierde la gente por servicios que no se pueden prever en el Gran Santo Domingo y proponer políticas públicas. Publicamos siempre resultados agregados, nunca respuestas de una persona.</p>
+  <p><b>Qué guardamos.</b> Tus respuestas, tu municipio y barrio, y si eres mujer u hombre. No pedimos nombre, teléfono, correo ni ubicación exacta. Lo que escribas en los campos libres puede citarse sin decir quién lo escribió, así que no pongas datos que te identifiquen.</p>
+  <p><b>Dónde.</b> En la cuenta de ArcGIS Online de Arcoíris. Solo el equipo del estudio puede ver las respuestas.</p>
+  <p><b>Tus derechos.</b> Participar es voluntario y puedes dejarlo cuando quieras. Como no guardamos datos personales, después de enviar no podemos localizar tus respuestas. Si tienes dudas, escribe a info@arcoirisrd.org o llama al 809 533 8710.</p>
+  <p class="muted">Tratamiento conforme a la Ley 172-13 de protección de datos de carácter personal.</p></div>`;
 function intro(sc){
   sc.appendChild(el(`<div class="hero"><div class="brand">${gaugeSVG()}<div><div class="ipu">IPU</div><div class="sub">Índice de<br>predictibilidad<br>urbana</div></div></div><span class="kicker">Juego · 8 minutos</span><h1>Mi semana en horas</h1>
   <p>Esperar el agua. Salir antes por si acaso. No saber cuándo se va la luz. Cuenta tu semana y mira cuánto tiempo te quita la ciudad.</p>
   
   <div class="facts"><span>1. Cuentas tu semana.</span><span>2. Ves tu índice y lo comparas.</span><span>3. Eliges qué cambiaría.</span><span>4. Pides tres medidas y dices a quién.</span></div>
-  <p class="small muted">Es anónimo: no pedimos nombre ni teléfono. Lo organiza Arcoíris para estudiar el Índice de Predictibilidad Urbana.</p></div>`));
-  const b=el(`<button type="button" class="btn" id="start">Empezar</button>`);sc.appendChild(b);
-  sc.querySelector("#start").onclick=()=>{step=1;render(true)};
+  </div>`));
+  sc.appendChild(el(`<details class="privacy" id="privacy"><summary>Cómo usamos tus datos</summary>${PRIVACY}</details>
+  <label class="consent" for="consent"><input type="checkbox" id="consent" ${S.consent?"checked":""}><span>Tengo 18 años o más, he leído cómo se usan mis datos y acepto participar.</span></label>
+  <button type="button" class="btn" id="start" ${S.consent?"":"disabled"}>Empezar</button>`));
+  sc.querySelector("#consent").onchange=e=>{S.consent=e.target.checked;sc.querySelector("#start").disabled=!S.consent};
+  sc.querySelector("#start").onclick=()=>{if(S.consent){step=1;render(true)}};
 }
 function perfil(sc){
   sc.appendChild(el(`<span class="kicker">Antes de empezar</span><h2>¿Dónde vives?</h2>`));
@@ -270,7 +279,7 @@ function perfil(sc){
 }
 function agua(sc){
   sc.appendChild(el(`<span class="kicker">Escena 1 de 4 · Agua</span><h2>El agua</h2>`));
-  sc.appendChild(q("¿Cuántos días a la semana te llega el agua?","agua_freq",[["Todos los días","diaria"],["De 4 a 6 días","4a6"],["De 1 a 3 días","1a3"],["Rara vez o nunca","rara"]]));
+  sc.appendChild(q("¿Cuántos días a la semana te llega el agua?","agua_freq",[["Todos los días","diaria"],["De 4 a 6 días","dias4a6"],["De 1 a 3 días","dias1a3"],["Rara vez o nunca","rara"]]));
   sc.appendChild(q("¿Sabes a qué hora o qué día va a llegar?","agua_sabe",SABE));
   sc.appendChild(q("¿Cuánto tiempo a la semana pasas esperándola, llenando o buscando agua?","agua_h",H5));
   nav(sc);
@@ -358,26 +367,37 @@ function pliego(sc){
   sc.appendChild(t);sc.querySelector("#otra").oninput=e=>{S.otra=e.target.value};
   nav(sc,{next:"Terminar"});
 }
-function surveyURL(r){
-  if(!SURVEY_ITEM_ID)return"";
-  const v={muni:S.muni,barrio:S.barrio,genero:S.genero,espera:S.espera,agua_freq:S.agua_freq,agua_sabe:S.agua_sabe,agua_h:S.agua_h,luz_freq:S.luz_freq,luz_sabe:S.luz_sabe,luz_h:S.luz_h,modo:S.modo,movil_h:S.movil_h,movil_sabe:S.movil_sabe,reserva_min:S.reserva_min,trayectos:S.trayectos,filas_h:S.filas_h,filas_sabe:S.filas_sabe,h_total:r.h.toFixed(2),u_media:r.u.toFixed(3),ipu:r.ipu.toFixed(1),usos:S.usos.join(" "),desorden:S.desorden,medidas:S.medidas.join(" "),
-    pet1:S.pets[0]?S.pets[0].id+"|"+S.pets[0].dest:"",pet2:S.pets[1]?S.pets[1].id+"|"+S.pets[1].dest:"",pet3:S.pets[2]?S.pets[2].id+"|"+S.pets[2].dest:"",otra:S.otra,reflexion:S.reflexion};
-  const qs=Object.entries(v).filter(([,x])=>x!==""&&x!==null).map(([k,x])=>`field:${FIELDS[k]}=${encodeURIComponent(x)}`).join("&");
-  return`https://survey123.arcgis.com/share/${SURVEY_ITEM_ID}?${qs}`;
+function attributes(r){
+  const pet=i=>S.pets[i]||{};
+  return{origen:"juego",version_juego:GAME_VERSION,consentimiento:"si",municipio:MUNI_CODE[S.muni]||"otro",barrio:S.barrio.trim().slice(0,100),genero:S.genero,espera_sola:S.espera,
+    agua_frec:S.agua_freq,agua_sabe:S.agua_sabe,agua_h:S.agua_h,luz_frec:S.luz_freq,luz_sabe:S.luz_sabe,luz_h:S.luz_h,
+    modo:S.modo,movil_h:S.movil_h,movil_sabe:S.movil_sabe,reserva_min:S.reserva_min,trayectos_sem:S.trayectos,filas_h:S.filas_h,filas_sabe:S.filas_sabe,
+    h_total:+r.h.toFixed(2),u_media:+r.u.toFixed(3),ipu:+r.ipu.toFixed(1),
+    usos_horas:S.usos.join(","),desorden:S.desorden,reflexion:S.reflexion.trim().slice(0,400),medidas_escalera:S.medidas.join(","),
+    peticion_1:pet(0).id||null,destino_1:DEST_CODE[pet(0).dest]||null,peticion_2:pet(1).id||null,destino_2:DEST_CODE[pet(1).dest]||null,
+    peticion_3:pet(2).id||null,destino_3:DEST_CODE[pet(2).dest]||null,peticion_otra:S.otra.trim().slice(0,300)};
+}
+const MUNI_CODE={"Distrito Nacional":"dn","Santo Domingo Este":"sde","Santo Domingo Norte":"sdn","Santo Domingo Oeste":"sdo","Los Alcarrizos":"alcarrizos","Pedro Brand":"pedro_brand","Boca Chica":"boca_chica","San Antonio de Guerra":"guerra","Bajos de Haina":"haina","Otro":"otro"};
+const DEST_CODE={"Ayuntamiento":"ayuntamiento","Acueducto (CAASD u otro)":"acueducto","Empresa de electricidad (EDE)":"ede","Transporte (INTRANT / OMSA)":"transporte","Gobierno central":"gobierno","Congreso":"congreso"};
+async function sendAnswers(r){
+  const body=new URLSearchParams({f:"json",rollbackOnFailure:"true",features:JSON.stringify([{attributes:attributes(r)}])});
+  const res=await fetch(LAYER_URL.replace(/\/+$/,"")+"/addFeatures",{method:"POST",body});
+  const j=await res.json();
+  if(j.error)throw new Error(j.error.message||"error");
+  if(!j.addResults||!j.addResults[0]||!j.addResults[0].success)throw new Error((j.addResults&&j.addResults[0]&&j.addResults[0].error&&j.addResults[0].error.description)||"no guardado");
 }
 function cierre(sc){
   const r=ipuOf(parts(S));const[lab,col]=lvl(r.ipu);const after=ipuOf(withMeasures(S,S.medidas)).ipu;
   const pets=S.pets.map(p=>{const m=MEAS.find(x=>x.id===p.id);return m.nm+(p.dest?` (a ${p.dest})`:"")});
   if(S.otra.trim())pets.push(S.otra.trim());
   const text=`Mi semana en horas: pierdo ${fmt(r.h)} horas a la semana y mi índice de predictibilidad es ${Math.round(r.ipu)} de 100. Pido: ${pets.map((p,i)=>`${i+1}) ${p}`).join("; ")}.`;
-  const url=surveyURL(r);
   sc.appendChild(el(`<span class="kicker">Gracias</span><h2>Esta es tu semana</h2>
    <div class="card"><div class="row"><span class="muted">Índice de predictibilidad</span><span class="chip" style="background:var(${col})">${lab}</span></div>
    <div class="row"><span style="font-family:var(--f-display);font-size:3.4rem;line-height:.9;color:var(${col})">${Math.round(r.ipu)}</span><span class="small muted" style="text-align:right">${fmt(r.h)} h perdidas por semana<br>con tus medidas: ${Math.round(after)}</span></div>
    <div><b>Mi pliego</b><ol>${pets.map(p=>`<li>${p.replace(/</g,"&lt;")}</li>`).join("")}</ol></div>
    <p class="small muted">${S.barrio?S.barrio.replace(/</g,"&lt;")+", ":""}${S.muni}</p></div>
    <div class="actions">
-     ${url?`<a class="btn" href="${url}" target="_blank" rel="noopener">Enviar mis respuestas</a><p class="small muted">Se abre la encuesta con todo relleno. Solo tienes que pulsar «Enviar».</p>`:`<button type="button" class="btn" disabled>Enviar mis respuestas</button><p class="note small"><b>Prototipo:</b> el envío a Survey123 se activa cuando se configure el formulario v3.</p>`}
+     ${LAYER_URL?`<button type="button" class="btn" id="send" ${S.sent?"disabled":""}>${S.sent?"Respuestas enviadas":"Sumar mi semana al estudio"}</button><p class="small muted" id="sendmsg" aria-live="polite">${S.sent?"Gracias. Tu semana ya forma parte del estudio.":"Se envían tus respuestas de forma anónima."}</p>`:`<button type="button" class="btn" disabled>Sumar mi semana al estudio</button><p class="note small"><b>Prototipo:</b> el envío se activa cuando se configure la capa de ArcGIS.</p>`}
      <a class="btn ghost" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">Compartir por WhatsApp</a>
      <button type="button" class="btn ghost" id="copy">Copiar mi resumen</button><p class="copied" id="copied" aria-live="polite"></p>
      <textarea id="sumtxt" readonly hidden>${text}</textarea>
@@ -385,6 +405,10 @@ function cierre(sc){
   sc.querySelector("#copy").onclick=()=>{const done=()=>{sc.querySelector("#copied").textContent="Copiado."};
     try{navigator.clipboard.writeText(text).then(done).catch(fb)}catch(e){fb()}
     function fb(){const ta=sc.querySelector("#sumtxt");ta.hidden=false;ta.select();sc.querySelector("#copied").textContent="Selecciona el texto y cópialo."}};
+  const sb=sc.querySelector("#send");
+  if(sb&&!S.sent)sb.onclick=async()=>{const m=sc.querySelector("#sendmsg");sb.disabled=true;sb.textContent="Enviando…";
+    try{await sendAnswers(r);S.sent=true;sb.textContent="Respuestas enviadas";m.textContent="Gracias. Tu semana ya forma parte del estudio."}
+    catch(e){sb.disabled=false;sb.textContent="Intentar de nuevo";m.textContent="No se pudo enviar. Revisa tu conexión e inténtalo otra vez."}};
   sc.querySelector("#again").onclick=()=>{S=initState();step=0;render(true)};
 }
 
